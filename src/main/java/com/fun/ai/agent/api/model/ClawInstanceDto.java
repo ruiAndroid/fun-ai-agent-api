@@ -7,6 +7,7 @@ public record ClawInstanceDto(
         UUID id,
         String name,
         UUID hostId,
+        String image,
         InstanceRuntime runtime,
         InstanceStatus status,
         InstanceDesiredState desiredState,

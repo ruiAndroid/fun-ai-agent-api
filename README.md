@@ -27,9 +27,29 @@ Schema is auto-initialized at startup via `src/main/resources/schema.sql`.
 ## Current Scope
 
 - `GET /v1/health`
+- `GET /v1/images`
 - `GET /v1/instances`
 - `POST /v1/instances`
 - `POST /v1/instances/{instanceId}/actions`
+
+## Runtime Image Presets
+
+Default preset image is configured in `src/main/resources/application.yml`:
+
+```yaml
+app:
+  images:
+    allow-custom-image: false
+    presets:
+      - id: zeroclaw-default
+        name: ZeroClaw Default
+        image: ${ZEROCLAW_PRESET_IMAGE:ghcr.io/zeroclaw-labs/zeroclaw:latest}
+        recommended: true
+```
+
+- `GET /v1/images` returns preset list for frontend image selector.
+- If `allow-custom-image: false`, `POST /v1/instances` only accepts images from the preset list.
+- Set `ZEROCLAW_PRESET_IMAGE` in deployment env to point to your own registry mirror.
 
 ## Update Script
 

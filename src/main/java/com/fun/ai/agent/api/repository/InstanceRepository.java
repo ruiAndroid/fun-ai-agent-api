@@ -24,6 +24,7 @@ public class InstanceRepository {
             rs.getObject("id", UUID.class),
             rs.getString("name"),
             rs.getObject("host_id", UUID.class),
+            rs.getString("image"),
             InstanceRuntime.valueOf(rs.getString("runtime")),
             InstanceStatus.valueOf(rs.getString("status")),
             InstanceDesiredState.valueOf(rs.getString("desired_state")),
@@ -37,7 +38,7 @@ public class InstanceRepository {
 
     public List<ClawInstanceDto> findAll() {
         return jdbcTemplate.query("""
-                        select id, name, host_id, runtime, status, desired_state, created_at, updated_at
+                        select id, name, host_id, image, runtime, status, desired_state, created_at, updated_at
                         from claw_instance
                         order by created_at asc
                         """,
@@ -47,7 +48,7 @@ public class InstanceRepository {
 
     public Optional<ClawInstanceDto> findById(UUID instanceId) {
         List<ClawInstanceDto> rows = jdbcTemplate.query("""
-                        select id, name, host_id, runtime, status, desired_state, created_at, updated_at
+                        select id, name, host_id, image, runtime, status, desired_state, created_at, updated_at
                         from claw_instance
                         where id = ?
                         """,
@@ -57,7 +58,7 @@ public class InstanceRepository {
         return rows.stream().findFirst();
     }
 
-    public void insert(ClawInstanceDto instance, String image) {
+    public void insert(ClawInstanceDto instance) {
         jdbcTemplate.update("""
                         insert into claw_instance
                         (id, name, host_id, image, runtime, status, desired_state, created_at, updated_at)
@@ -66,7 +67,7 @@ public class InstanceRepository {
                 instance.id(),
                 instance.name(),
                 instance.hostId(),
-                image,
+                instance.image(),
                 instance.runtime().name(),
                 instance.status().name(),
                 instance.desiredState().name(),
