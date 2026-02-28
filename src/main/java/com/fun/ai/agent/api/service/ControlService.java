@@ -27,10 +27,14 @@ public class ControlService {
 
     private final InstanceRepository instanceRepository;
     private final ImageCatalogProperties imageCatalogProperties;
+    private final PlaneClient planeClient;
 
-    public ControlService(InstanceRepository instanceRepository, ImageCatalogProperties imageCatalogProperties) {
+    public ControlService(InstanceRepository instanceRepository,
+                          ImageCatalogProperties imageCatalogProperties,
+                          PlaneClient planeClient) {
         this.instanceRepository = instanceRepository;
         this.imageCatalogProperties = imageCatalogProperties;
+        this.planeClient = planeClient;
     }
 
     public List<ClawInstanceDto> listInstances() {
@@ -69,7 +73,7 @@ public class ControlService {
         UUID instanceId = UUID.randomUUID();
         Instant now = Instant.now();
         InstanceDesiredState desiredState = Objects.requireNonNullElse(request.desiredState(), InstanceDesiredState.RUNNING);
-        InstanceStatus status = desiredState == InstanceDesiredState.RUNNING ? InstanceStatus.RUNNING : InstanceStatus.STOPPED;
+        InstanceStatus status = desiredState == InstanceDesiredState.RUNNING ? InstanceStatus.CREATING : InstanceStatus.STOPPED;
 
         ClawInstanceDto instance = new ClawInstanceDto(
                 instanceId,
@@ -83,37 +87,79 @@ public class ControlService {
                 now
         );
         instanceRepository.insert(instance);
+
+        if (desiredState == InstanceDesiredState.RUNNING) {
+            PlaneClient.PlaneTaskExecutionRecord execution = planeClient.reconcileInstanceAction(
+                    instance.id(),
+                    InstanceActionType.START,
+                    instance.image()
+            );
+            if (!execution.succeeded()) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "plane execution failed: " + execution.message());
+            }
+            Instant updatedAt = Instant.now();
+            InstanceStatus finalStatus = InstanceStatus.RUNNING;
+            instanceRepository.updateState(instance.id(), finalStatus, desiredState, updatedAt);
+            return new ClawInstanceDto(
+                    instance.id(),
+                    instance.name(),
+                    instance.hostId(),
+                    instance.image(),
+                    instance.runtime(),
+                    finalStatus,
+                    desiredState,
+                    instance.createdAt(),
+                    updatedAt
+            );
+        }
+
         return instance;
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = ResponseStatusException.class)
     public AcceptedActionResponse submitInstanceAction(UUID instanceId, InstanceActionRequest request) {
         ClawInstanceDto instance = getInstance(instanceId);
         Instant now = Instant.now();
 
-        InstanceDesiredState desiredState = instance.desiredState();
-        InstanceStatus status = instance.status();
-
-        if (request.action() == InstanceActionType.START) {
-            desiredState = InstanceDesiredState.RUNNING;
-            status = InstanceStatus.RUNNING;
-        } else if (request.action() == InstanceActionType.STOP) {
-            desiredState = InstanceDesiredState.STOPPED;
-            status = InstanceStatus.STOPPED;
-        } else if (request.action() == InstanceActionType.RESTART) {
-            desiredState = InstanceDesiredState.RUNNING;
-            status = InstanceStatus.RUNNING;
-        } else if (request.action() == InstanceActionType.ROLLBACK) {
-            status = InstanceStatus.CREATING;
+        InstanceDesiredState desiredState = desiredStateForAction(request.action());
+        PlaneClient.PlaneTaskExecutionRecord execution;
+        try {
+            execution = planeClient.reconcileInstanceAction(
+                    instance.id(),
+                    request.action(),
+                    instance.image()
+            );
+        } catch (ResponseStatusException ex) {
+            instanceRepository.updateState(instance.id(), InstanceStatus.ERROR, desiredState, now);
+            instanceRepository.insertAction(
+                    instance.id(),
+                    request.action(),
+                    failureReason(request.reason(), ex.getReason()),
+                    now
+            );
+            throw ex;
         }
+        InstanceStatus status = execution.succeeded()
+                ? statusForSuccessfulAction(request.action())
+                : InstanceStatus.ERROR;
 
         instanceRepository.updateState(instance.id(), status, desiredState, now);
-        UUID actionTaskId = instanceRepository.insertAction(instance.id(), request.action(), request.reason(), now);
+        UUID actionTaskId = instanceRepository.insertAction(
+                instance.id(),
+                request.action(),
+                execution.succeeded() ? request.reason() : failureReason(request.reason(), execution.message()),
+                now
+        );
+        if (!execution.succeeded()) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "plane execution failed: " + execution.message());
+        }
         return new AcceptedActionResponse(actionTaskId, now);
     }
 
     @Transactional
     public void deleteInstance(UUID instanceId) {
+        getInstance(instanceId);
+        planeClient.deleteInstance(instanceId);
         int deletedRows = instanceRepository.deleteById(instanceId);
         if (deletedRows == 0) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "instance not found");
@@ -158,5 +204,27 @@ public class ControlService {
         return StringUtils.hasText(preset.getId())
                 && StringUtils.hasText(preset.getName())
                 && StringUtils.hasText(preset.getImage());
+    }
+
+    private InstanceDesiredState desiredStateForAction(InstanceActionType action) {
+        return switch (action) {
+            case STOP -> InstanceDesiredState.STOPPED;
+            case START, RESTART, ROLLBACK -> InstanceDesiredState.RUNNING;
+        };
+    }
+
+    private InstanceStatus statusForSuccessfulAction(InstanceActionType action) {
+        return switch (action) {
+            case STOP -> InstanceStatus.STOPPED;
+            case START, RESTART, ROLLBACK -> InstanceStatus.RUNNING;
+        };
+    }
+
+    private String failureReason(String reason, String executionMessage) {
+        String fallback = StringUtils.hasText(executionMessage) ? executionMessage : "plane execution failed";
+        if (!StringUtils.hasText(reason)) {
+            return "[FAILED] " + fallback;
+        }
+        return reason + " | [FAILED] " + fallback;
     }
 }
