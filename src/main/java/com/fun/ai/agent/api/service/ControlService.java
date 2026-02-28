@@ -111,12 +111,15 @@ public class ControlService {
         }
 
         if (desiredState == InstanceDesiredState.RUNNING) {
-            PlaneClient.PlaneTaskExecutionRecord execution = planeClient.reconcileInstanceAction(
+            PlaneExecutionResult executionResult = executeActionWithGatewayPortRetry(
                     instance.id(),
+                    instance.hostId(),
                     InstanceActionType.START,
                     instance.image(),
-                    instance.gatewayHostPort()
+                    instance.gatewayHostPort(),
+                    now
             );
+            PlaneClient.PlaneTaskExecutionRecord execution = executionResult.execution();
             if (!execution.succeeded()) {
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "plane execution failed: " + execution.message());
             }
@@ -128,8 +131,8 @@ public class ControlService {
                     instance.name(),
                     instance.hostId(),
                     instance.image(),
-                    instance.gatewayHostPort(),
-                    instance.gatewayUrl(),
+                    executionResult.gatewayHostPort(),
+                    resolveGatewayUrl(instance.id(), executionResult.gatewayHostPort()),
                     instance.runtime(),
                     finalStatus,
                     desiredState,
@@ -145,17 +148,18 @@ public class ControlService {
     public AcceptedActionResponse submitInstanceAction(UUID instanceId, InstanceActionRequest request) {
         ClawInstanceDto instance = getInstance(instanceId);
         Instant now = Instant.now();
-        Integer gatewayHostPort = instance.gatewayHostPort();
 
         InstanceDesiredState desiredState = desiredStateForAction(request.action());
         PlaneClient.PlaneTaskExecutionRecord execution;
         try {
-            execution = planeClient.reconcileInstanceAction(
+            execution = executeActionWithGatewayPortRetry(
                     instance.id(),
+                    instance.hostId(),
                     request.action(),
                     instance.image(),
-                    gatewayHostPort
-            );
+                    instance.gatewayHostPort(),
+                    now
+            ).execution();
         } catch (ResponseStatusException ex) {
             instanceRepository.updateState(instance.id(), InstanceStatus.ERROR, desiredState, now);
             instanceRepository.insertAction(
@@ -257,6 +261,14 @@ public class ControlService {
     }
 
     private int allocateGatewayPort(UUID hostId) {
+        Integer availablePort = findNextAvailableGatewayPort(hostId, Set.of());
+        if (availablePort != null) {
+            return availablePort;
+        }
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "no available gateway host ports");
+    }
+
+    private Integer findNextAvailableGatewayPort(UUID hostId, Set<Integer> excludedPorts) {
         if (gatewayPortRangeStart <= 0
                 || gatewayPortRangeEnd <= 0
                 || gatewayPortRangeStart > gatewayPortRangeEnd
@@ -265,12 +277,95 @@ public class ControlService {
         }
 
         Set<Integer> allocated = new HashSet<>(instanceRepository.findAllocatedGatewayPortsByHostId(hostId));
+        allocated.addAll(excludedPorts);
         for (int port = gatewayPortRangeStart; port <= gatewayPortRangeEnd; port++) {
             if (!allocated.contains(port)) {
                 return port;
             }
         }
-        throw new ResponseStatusException(HttpStatus.CONFLICT, "no available gateway host ports");
+        return null;
+    }
+
+    private PlaneExecutionResult executeActionWithGatewayPortRetry(UUID instanceId,
+                                                                   UUID hostId,
+                                                                   InstanceActionType action,
+                                                                   String image,
+                                                                   Integer initialGatewayHostPort,
+                                                                   Instant updatedAt) {
+        if (!actionRequiresGatewayPort(action)) {
+            PlaneClient.PlaneTaskExecutionRecord execution = planeClient.reconcileInstanceAction(
+                    instanceId,
+                    action,
+                    image,
+                    initialGatewayHostPort
+            );
+            return new PlaneExecutionResult(execution, initialGatewayHostPort);
+        }
+
+        Set<Integer> attemptedPorts = new HashSet<>();
+        Integer gatewayHostPort = initialGatewayHostPort;
+        if (gatewayHostPort == null) {
+            gatewayHostPort = assignNextGatewayHostPort(instanceId, hostId, updatedAt, attemptedPorts);
+            if (gatewayHostPort == null) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "no available gateway host ports");
+            }
+        }
+
+        int remainingRetries = Math.max(0, gatewayPortRangeEnd - gatewayPortRangeStart);
+        while (true) {
+            attemptedPorts.add(gatewayHostPort);
+            PlaneClient.PlaneTaskExecutionRecord execution = planeClient.reconcileInstanceAction(
+                    instanceId,
+                    action,
+                    image,
+                    gatewayHostPort
+            );
+            if (execution.succeeded() || !isGatewayPortConflictMessage(execution.message()) || remainingRetries == 0) {
+                return new PlaneExecutionResult(execution, gatewayHostPort);
+            }
+
+            Integer nextPort = assignNextGatewayHostPort(instanceId, hostId, Instant.now(), attemptedPorts);
+            if (nextPort == null) {
+                return new PlaneExecutionResult(execution, gatewayHostPort);
+            }
+            gatewayHostPort = nextPort;
+            remainingRetries--;
+        }
+    }
+
+    private Integer assignNextGatewayHostPort(UUID instanceId,
+                                              UUID hostId,
+                                              Instant updatedAt,
+                                              Set<Integer> attemptedPorts) {
+        while (true) {
+            Integer nextPort = findNextAvailableGatewayPort(hostId, attemptedPorts);
+            if (nextPort == null) {
+                return null;
+            }
+            attemptedPorts.add(nextPort);
+            try {
+                instanceRepository.updateGatewayHostPort(instanceId, nextPort, updatedAt);
+                return nextPort;
+            } catch (DataIntegrityViolationException ex) {
+                // Port may be taken by concurrent transaction, continue with the next candidate.
+            }
+        }
+    }
+
+    private boolean actionRequiresGatewayPort(InstanceActionType action) {
+        return action == InstanceActionType.START
+                || action == InstanceActionType.RESTART
+                || action == InstanceActionType.ROLLBACK;
+    }
+
+    private boolean isGatewayPortConflictMessage(String message) {
+        if (!StringUtils.hasText(message)) {
+            return false;
+        }
+        String normalized = message.toLowerCase();
+        return normalized.contains("port is already allocated")
+                || normalized.contains("address already in use")
+                || (normalized.contains("bind") && normalized.contains("failed"));
     }
 
     private ClawInstanceDto attachGatewayUrl(ClawInstanceDto instance) {
@@ -297,5 +392,8 @@ public class ControlService {
         return gatewayUrlTemplate
                 .replace("{port}", String.valueOf(gatewayHostPort))
                 .replace("{instanceId}", instanceId.toString());
+    }
+
+    private record PlaneExecutionResult(PlaneClient.PlaneTaskExecutionRecord execution, Integer gatewayHostPort) {
     }
 }

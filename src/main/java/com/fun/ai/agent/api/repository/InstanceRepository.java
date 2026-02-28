@@ -118,6 +118,18 @@ public class InstanceRepository {
         );
     }
 
+    public void updateGatewayHostPort(UUID instanceId, int gatewayHostPort, Instant updatedAt) {
+        jdbcTemplate.update("""
+                        update claw_instance
+                        set gateway_host_port = ?, updated_at = ?
+                        where id = ?
+                        """,
+                gatewayHostPort,
+                Timestamp.from(updatedAt),
+                instanceId
+        );
+    }
+
     public int deleteById(UUID instanceId) {
         return jdbcTemplate.update("""
                         delete from claw_instance
