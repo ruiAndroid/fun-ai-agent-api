@@ -324,6 +324,7 @@ public class ControlService {
                 return new PlaneExecutionResult(execution, gatewayHostPort);
             }
 
+            cleanupFailedInstanceContainer(instanceId);
             Integer nextPort = assignNextGatewayHostPort(instanceId, hostId, Instant.now(), attemptedPorts);
             if (nextPort == null) {
                 return new PlaneExecutionResult(execution, gatewayHostPort);
@@ -366,6 +367,14 @@ public class ControlService {
         return normalized.contains("port is already allocated")
                 || normalized.contains("address already in use")
                 || (normalized.contains("bind") && normalized.contains("failed"));
+    }
+
+    private void cleanupFailedInstanceContainer(UUID instanceId) {
+        try {
+            planeClient.deleteInstance(instanceId);
+        } catch (ResponseStatusException ex) {
+            // Best effort cleanup; creation flow will return the original failure if retry still fails.
+        }
     }
 
     private ClawInstanceDto attachGatewayUrl(ClawInstanceDto instance) {
