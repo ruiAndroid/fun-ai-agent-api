@@ -7,7 +7,7 @@ import com.fun.ai.agent.api.model.InstanceActionType;
 import com.fun.ai.agent.api.model.InstanceDesiredState;
 import com.fun.ai.agent.api.model.InstanceRuntime;
 import com.fun.ai.agent.api.model.InstanceStatus;
-import com.fun.ai.agent.api.model.LobsterInstanceDto;
+import com.fun.ai.agent.api.model.ClawInstanceDto;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -23,15 +23,15 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class ControlService {
 
-    private final Map<UUID, LobsterInstanceDto> instances = new ConcurrentHashMap<>();
+    private final Map<UUID, ClawInstanceDto> instances = new ConcurrentHashMap<>();
 
-    public List<LobsterInstanceDto> listInstances() {
+    public List<ClawInstanceDto> listInstances() {
         return instances.values().stream()
-                .sorted(Comparator.comparing(LobsterInstanceDto::createdAt))
+                .sorted(Comparator.comparing(ClawInstanceDto::createdAt))
                 .toList();
     }
 
-    public LobsterInstanceDto createInstance(CreateInstanceRequest request) {
+    public ClawInstanceDto createInstance(CreateInstanceRequest request) {
         UUID hostId;
         try {
             hostId = UUID.fromString(request.hostId());
@@ -44,7 +44,7 @@ public class ControlService {
         InstanceDesiredState desiredState = Objects.requireNonNullElse(request.desiredState(), InstanceDesiredState.RUNNING);
         InstanceStatus status = desiredState == InstanceDesiredState.RUNNING ? InstanceStatus.RUNNING : InstanceStatus.STOPPED;
 
-        LobsterInstanceDto instance = new LobsterInstanceDto(
+        ClawInstanceDto instance = new ClawInstanceDto(
                 instanceId,
                 request.name(),
                 hostId,
@@ -59,7 +59,7 @@ public class ControlService {
     }
 
     public AcceptedActionResponse submitInstanceAction(UUID instanceId, InstanceActionRequest request) {
-        LobsterInstanceDto instance = getInstance(instanceId);
+        ClawInstanceDto instance = getInstance(instanceId);
         Instant now = Instant.now();
 
         InstanceDesiredState desiredState = instance.desiredState();
@@ -78,7 +78,7 @@ public class ControlService {
             status = InstanceStatus.CREATING;
         }
 
-        LobsterInstanceDto updated = new LobsterInstanceDto(
+        ClawInstanceDto updated = new ClawInstanceDto(
                 instance.id(),
                 instance.name(),
                 instance.hostId(),
@@ -92,8 +92,8 @@ public class ControlService {
         return new AcceptedActionResponse(UUID.randomUUID(), now);
     }
 
-    private LobsterInstanceDto getInstance(UUID instanceId) {
-        LobsterInstanceDto instance = instances.get(instanceId);
+    private ClawInstanceDto getInstance(UUID instanceId) {
+        ClawInstanceDto instance = instances.get(instanceId);
         if (instance == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "instance not found");
         }

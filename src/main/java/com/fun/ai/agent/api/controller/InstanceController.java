@@ -4,7 +4,7 @@ import com.fun.ai.agent.api.model.AcceptedActionResponse;
 import com.fun.ai.agent.api.model.CreateInstanceRequest;
 import com.fun.ai.agent.api.model.InstanceActionRequest;
 import com.fun.ai.agent.api.model.ListResponse;
-import com.fun.ai.agent.api.model.LobsterInstanceDto;
+import com.fun.ai.agent.api.model.ClawInstanceDto;
 import com.fun.ai.agent.api.service.ControlService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -29,13 +29,13 @@ public class InstanceController {
     }
 
     @GetMapping
-    public ListResponse<LobsterInstanceDto> listInstances() {
+    public ListResponse<ClawInstanceDto> listInstances() {
         return new ListResponse<>(controlService.listInstances());
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public LobsterInstanceDto createInstance(@Valid @RequestBody CreateInstanceRequest request) {
+    public ClawInstanceDto createInstance(@Valid @RequestBody CreateInstanceRequest request) {
         return controlService.createInstance(request);
     }
 
