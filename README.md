@@ -30,6 +30,7 @@ Schema is auto-initialized at startup via `src/main/resources/schema.sql`.
 - `GET /v1/images`
 - `GET /v1/instances`
 - `POST /v1/instances`
+- `DELETE /v1/instances/{instanceId}`
 - `POST /v1/instances/{instanceId}/actions`
 
 ## Runtime Image Presets
@@ -50,6 +51,7 @@ app:
 - `GET /v1/images` returns preset list for frontend image selector.
 - If `allow-custom-image: false`, `POST /v1/instances` only accepts images from the preset list.
 - `POST /v1/instances` returns `409 Conflict` if instance name already exists (case-insensitive).
+- `DELETE /v1/instances/{instanceId}` removes the instance and its action history.
 - Set `ZEROCLAW_PRESET_IMAGE` in deployment env to point to your own registry mirror.
 
 ## Update Script

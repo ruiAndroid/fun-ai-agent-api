@@ -25,7 +25,7 @@ app:
     presets:
       - id: zeroclaw-default
         name: ZeroClaw Default
-        image: ${ZEROCLAW_PRESET_IMAGE:ghcr.io/zeroclaw-labs/zeroclaw:latest}
+        image: ${ZEROCLAW_PRESET_IMAGE:zeroclaw:latest}
         description: Official ZeroClaw image (gateway mode)
         recommended: true
 

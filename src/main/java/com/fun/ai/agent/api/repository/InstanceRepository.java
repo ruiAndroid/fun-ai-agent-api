@@ -103,6 +103,15 @@ public class InstanceRepository {
         );
     }
 
+    public int deleteById(UUID instanceId) {
+        return jdbcTemplate.update("""
+                        delete from claw_instance
+                        where id = ?
+                        """,
+                instanceId
+        );
+    }
+
     public UUID insertAction(UUID instanceId, InstanceActionType action, String reason, Instant acceptedAt) {
         UUID actionId = UUID.randomUUID();
         jdbcTemplate.update("""

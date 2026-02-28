@@ -112,6 +112,14 @@ public class ControlService {
         return new AcceptedActionResponse(actionTaskId, now);
     }
 
+    @Transactional
+    public void deleteInstance(UUID instanceId) {
+        int deletedRows = instanceRepository.deleteById(instanceId);
+        if (deletedRows == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "instance not found");
+        }
+    }
+
     private ClawInstanceDto getInstance(UUID instanceId) {
         return instanceRepository.findById(instanceId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "instance not found"));
