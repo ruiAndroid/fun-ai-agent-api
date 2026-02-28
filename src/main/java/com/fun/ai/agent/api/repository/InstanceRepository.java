@@ -25,6 +25,8 @@ public class InstanceRepository {
             rs.getString("name"),
             rs.getObject("host_id", UUID.class),
             rs.getString("image"),
+            (Integer) rs.getObject("gateway_host_port"),
+            null,
             InstanceRuntime.valueOf(rs.getString("runtime")),
             InstanceStatus.valueOf(rs.getString("status")),
             InstanceDesiredState.valueOf(rs.getString("desired_state")),
@@ -38,7 +40,7 @@ public class InstanceRepository {
 
     public List<ClawInstanceDto> findAll() {
         return jdbcTemplate.query("""
-                        select id, name, host_id, image, runtime, status, desired_state, created_at, updated_at
+                        select id, name, host_id, image, gateway_host_port, runtime, status, desired_state, created_at, updated_at
                         from claw_instance
                         order by created_at asc
                         """,
@@ -48,7 +50,7 @@ public class InstanceRepository {
 
     public Optional<ClawInstanceDto> findById(UUID instanceId) {
         List<ClawInstanceDto> rows = jdbcTemplate.query("""
-                        select id, name, host_id, image, runtime, status, desired_state, created_at, updated_at
+                        select id, name, host_id, image, gateway_host_port, runtime, status, desired_state, created_at, updated_at
                         from claw_instance
                         where id = ?
                         """,
@@ -75,13 +77,14 @@ public class InstanceRepository {
     public void insert(ClawInstanceDto instance) {
         jdbcTemplate.update("""
                         insert into claw_instance
-                        (id, name, host_id, image, runtime, status, desired_state, created_at, updated_at)
-                        values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        (id, name, host_id, image, gateway_host_port, runtime, status, desired_state, created_at, updated_at)
+                        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                 instance.id(),
                 instance.name(),
                 instance.hostId(),
                 instance.image(),
+                instance.gatewayHostPort(),
                 instance.runtime().name(),
                 instance.status().name(),
                 instance.desiredState().name(),
@@ -100,6 +103,18 @@ public class InstanceRepository {
                 desiredState.name(),
                 Timestamp.from(updatedAt),
                 instanceId
+        );
+    }
+
+    public List<Integer> findAllocatedGatewayPortsByHostId(UUID hostId) {
+        return jdbcTemplate.queryForList("""
+                        select gateway_host_port
+                        from claw_instance
+                        where host_id = ?
+                          and gateway_host_port is not null
+                        """,
+                Integer.class,
+                hostId
         );
     }
 

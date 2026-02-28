@@ -29,10 +29,14 @@ public class PlaneClient {
 
     public PlaneTaskExecutionRecord reconcileInstanceAction(UUID instanceId,
                                                             InstanceActionType action,
-                                                            String image) {
+                                                            String image,
+                                                            Integer gatewayHostPort) {
         Map<String, Object> payload = new HashMap<>();
         if (StringUtils.hasText(image)) {
             payload.put("image", image.trim());
+        }
+        if (gatewayHostPort != null) {
+            payload.put("gatewayHostPort", gatewayHostPort);
         }
 
         PlaneReconcileRequest request = new PlaneReconcileRequest(

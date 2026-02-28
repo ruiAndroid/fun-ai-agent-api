@@ -11,6 +11,8 @@ import com.fun.ai.agent.api.model.InstanceDesiredState;
 import com.fun.ai.agent.api.model.InstanceRuntime;
 import com.fun.ai.agent.api.model.InstanceStatus;
 import com.fun.ai.agent.api.repository.InstanceRepository;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,8 +20,10 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -28,17 +32,28 @@ public class ControlService {
     private final InstanceRepository instanceRepository;
     private final ImageCatalogProperties imageCatalogProperties;
     private final PlaneClient planeClient;
+    private final int gatewayPortRangeStart;
+    private final int gatewayPortRangeEnd;
+    private final String gatewayUrlTemplate;
 
     public ControlService(InstanceRepository instanceRepository,
                           ImageCatalogProperties imageCatalogProperties,
-                          PlaneClient planeClient) {
+                          PlaneClient planeClient,
+                          @Value("${app.gateway.port-range-start:42617}") int gatewayPortRangeStart,
+                          @Value("${app.gateway.port-range-end:42717}") int gatewayPortRangeEnd,
+                          @Value("${app.gateway.url-template:http://172.21.138.98:{port}}") String gatewayUrlTemplate) {
         this.instanceRepository = instanceRepository;
         this.imageCatalogProperties = imageCatalogProperties;
         this.planeClient = planeClient;
+        this.gatewayPortRangeStart = gatewayPortRangeStart;
+        this.gatewayPortRangeEnd = gatewayPortRangeEnd;
+        this.gatewayUrlTemplate = gatewayUrlTemplate;
     }
 
     public List<ClawInstanceDto> listInstances() {
-        return instanceRepository.findAll();
+        return instanceRepository.findAll().stream()
+                .map(this::attachGatewayUrl)
+                .toList();
     }
 
     public List<ImagePresetDto> listImagePresets() {
@@ -74,25 +89,33 @@ public class ControlService {
         Instant now = Instant.now();
         InstanceDesiredState desiredState = Objects.requireNonNullElse(request.desiredState(), InstanceDesiredState.RUNNING);
         InstanceStatus status = desiredState == InstanceDesiredState.RUNNING ? InstanceStatus.CREATING : InstanceStatus.STOPPED;
+        int gatewayHostPort = allocateGatewayPort(hostId);
 
         ClawInstanceDto instance = new ClawInstanceDto(
                 instanceId,
                 name,
                 hostId,
                 image,
+                gatewayHostPort,
+                resolveGatewayUrl(instanceId, gatewayHostPort),
                 InstanceRuntime.ZEROCLAW,
                 status,
                 desiredState,
                 now,
                 now
         );
-        instanceRepository.insert(instance);
+        try {
+            instanceRepository.insert(instance);
+        } catch (DataIntegrityViolationException ex) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "gateway host port already allocated");
+        }
 
         if (desiredState == InstanceDesiredState.RUNNING) {
             PlaneClient.PlaneTaskExecutionRecord execution = planeClient.reconcileInstanceAction(
                     instance.id(),
                     InstanceActionType.START,
-                    instance.image()
+                    instance.image(),
+                    instance.gatewayHostPort()
             );
             if (!execution.succeeded()) {
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "plane execution failed: " + execution.message());
@@ -105,6 +128,8 @@ public class ControlService {
                     instance.name(),
                     instance.hostId(),
                     instance.image(),
+                    instance.gatewayHostPort(),
+                    instance.gatewayUrl(),
                     instance.runtime(),
                     finalStatus,
                     desiredState,
@@ -113,13 +138,14 @@ public class ControlService {
             );
         }
 
-        return instance;
+        return attachGatewayUrl(instance);
     }
 
     @Transactional(noRollbackFor = ResponseStatusException.class)
     public AcceptedActionResponse submitInstanceAction(UUID instanceId, InstanceActionRequest request) {
         ClawInstanceDto instance = getInstance(instanceId);
         Instant now = Instant.now();
+        Integer gatewayHostPort = instance.gatewayHostPort();
 
         InstanceDesiredState desiredState = desiredStateForAction(request.action());
         PlaneClient.PlaneTaskExecutionRecord execution;
@@ -127,7 +153,8 @@ public class ControlService {
             execution = planeClient.reconcileInstanceAction(
                     instance.id(),
                     request.action(),
-                    instance.image()
+                    instance.image(),
+                    gatewayHostPort
             );
         } catch (ResponseStatusException ex) {
             instanceRepository.updateState(instance.id(), InstanceStatus.ERROR, desiredState, now);
@@ -168,6 +195,7 @@ public class ControlService {
 
     private ClawInstanceDto getInstance(UUID instanceId) {
         return instanceRepository.findById(instanceId)
+                .map(this::attachGatewayUrl)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "instance not found"));
     }
 
@@ -226,5 +254,48 @@ public class ControlService {
             return "[FAILED] " + fallback;
         }
         return reason + " | [FAILED] " + fallback;
+    }
+
+    private int allocateGatewayPort(UUID hostId) {
+        if (gatewayPortRangeStart <= 0
+                || gatewayPortRangeEnd <= 0
+                || gatewayPortRangeStart > gatewayPortRangeEnd
+                || gatewayPortRangeEnd > 65535) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "invalid gateway port range configuration");
+        }
+
+        Set<Integer> allocated = new HashSet<>(instanceRepository.findAllocatedGatewayPortsByHostId(hostId));
+        for (int port = gatewayPortRangeStart; port <= gatewayPortRangeEnd; port++) {
+            if (!allocated.contains(port)) {
+                return port;
+            }
+        }
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "no available gateway host ports");
+    }
+
+    private ClawInstanceDto attachGatewayUrl(ClawInstanceDto instance) {
+        String gatewayUrl = resolveGatewayUrl(instance.id(), instance.gatewayHostPort());
+        return new ClawInstanceDto(
+                instance.id(),
+                instance.name(),
+                instance.hostId(),
+                instance.image(),
+                instance.gatewayHostPort(),
+                gatewayUrl,
+                instance.runtime(),
+                instance.status(),
+                instance.desiredState(),
+                instance.createdAt(),
+                instance.updatedAt()
+        );
+    }
+
+    private String resolveGatewayUrl(UUID instanceId, Integer gatewayHostPort) {
+        if (gatewayHostPort == null || !StringUtils.hasText(gatewayUrlTemplate)) {
+            return null;
+        }
+        return gatewayUrlTemplate
+                .replace("{port}", String.valueOf(gatewayHostPort))
+                .replace("{instanceId}", instanceId.toString());
     }
 }

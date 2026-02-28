@@ -23,6 +23,10 @@ app:
   plane:
     base-url: ${PLANE_BASE_URL:http://127.0.0.1:8090/internal/v1}
     requested-by: ${PLANE_REQUESTED_BY:fun-ai-agent-api}
+  gateway:
+    port-range-start: ${GATEWAY_PORT_RANGE_START:42617}
+    port-range-end: ${GATEWAY_PORT_RANGE_END:42717}
+    url-template: ${GATEWAY_URL_TEMPLATE:http://172.21.138.98:{port}}
   images:
     allow-custom-image: false
     presets:

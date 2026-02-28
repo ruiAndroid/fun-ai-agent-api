@@ -8,6 +8,8 @@ public record ClawInstanceDto(
         String name,
         UUID hostId,
         String image,
+        Integer gatewayHostPort,
+        String gatewayUrl,
         InstanceRuntime runtime,
         InstanceStatus status,
         InstanceDesiredState desiredState,
