@@ -49,6 +49,7 @@ app:
 
 - `GET /v1/images` returns preset list for frontend image selector.
 - If `allow-custom-image: false`, `POST /v1/instances` only accepts images from the preset list.
+- `POST /v1/instances` returns `409 Conflict` if instance name already exists (case-insensitive).
 - Set `ZEROCLAW_PRESET_IMAGE` in deployment env to point to your own registry mirror.
 
 ## Update Script

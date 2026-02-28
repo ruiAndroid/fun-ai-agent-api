@@ -53,12 +53,15 @@ public class ControlService {
 
     @Transactional
     public ClawInstanceDto createInstance(CreateInstanceRequest request) {
+        String name = request.name().trim();
+        validateInstanceName(name);
+
         String image = request.image().trim();
         validateRequestedImage(image);
 
         UUID hostId;
         try {
-            hostId = UUID.fromString(request.hostId());
+            hostId = UUID.fromString(request.hostId().trim());
         } catch (IllegalArgumentException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "hostId must be a valid UUID");
         }
@@ -70,7 +73,7 @@ public class ControlService {
 
         ClawInstanceDto instance = new ClawInstanceDto(
                 instanceId,
-                request.name(),
+                name,
                 hostId,
                 image,
                 InstanceRuntime.ZEROCLAW,
@@ -112,6 +115,16 @@ public class ControlService {
     private ClawInstanceDto getInstance(UUID instanceId) {
         return instanceRepository.findById(instanceId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "instance not found"));
+    }
+
+    private void validateInstanceName(String name) {
+        if (!StringUtils.hasText(name)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "name must not be blank");
+        }
+
+        if (instanceRepository.existsByNameIgnoreCase(name)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "instance name already exists");
+        }
     }
 
     private void validateRequestedImage(String image) {

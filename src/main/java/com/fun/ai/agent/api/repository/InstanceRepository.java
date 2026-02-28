@@ -58,6 +58,20 @@ public class InstanceRepository {
         return rows.stream().findFirst();
     }
 
+    public boolean existsByNameIgnoreCase(String name) {
+        Boolean exists = jdbcTemplate.queryForObject("""
+                        select exists(
+                            select 1
+                            from claw_instance
+                            where lower(name) = lower(?)
+                        )
+                        """,
+                Boolean.class,
+                name
+        );
+        return Boolean.TRUE.equals(exists);
+    }
+
     public void insert(ClawInstanceDto instance) {
         jdbcTemplate.update("""
                         insert into claw_instance
