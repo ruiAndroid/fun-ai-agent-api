@@ -8,29 +8,31 @@ import com.fun.ai.agent.api.model.InstanceDesiredState;
 import com.fun.ai.agent.api.model.InstanceRuntime;
 import com.fun.ai.agent.api.model.InstanceStatus;
 import com.fun.ai.agent.api.model.ClawInstanceDto;
+import com.fun.ai.agent.api.repository.InstanceRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class ControlService {
 
-    private final Map<UUID, ClawInstanceDto> instances = new ConcurrentHashMap<>();
+    private final InstanceRepository instanceRepository;
 
-    public List<ClawInstanceDto> listInstances() {
-        return instances.values().stream()
-                .sorted(Comparator.comparing(ClawInstanceDto::createdAt))
-                .toList();
+    public ControlService(InstanceRepository instanceRepository) {
+        this.instanceRepository = instanceRepository;
     }
 
+    public List<ClawInstanceDto> listInstances() {
+        return instanceRepository.findAll();
+    }
+
+    @Transactional
     public ClawInstanceDto createInstance(CreateInstanceRequest request) {
         UUID hostId;
         try {
@@ -54,10 +56,11 @@ public class ControlService {
                 now,
                 now
         );
-        instances.put(instanceId, instance);
+        instanceRepository.insert(instance, request.image());
         return instance;
     }
 
+    @Transactional
     public AcceptedActionResponse submitInstanceAction(UUID instanceId, InstanceActionRequest request) {
         ClawInstanceDto instance = getInstance(instanceId);
         Instant now = Instant.now();
@@ -78,25 +81,13 @@ public class ControlService {
             status = InstanceStatus.CREATING;
         }
 
-        ClawInstanceDto updated = new ClawInstanceDto(
-                instance.id(),
-                instance.name(),
-                instance.hostId(),
-                instance.runtime(),
-                status,
-                desiredState,
-                instance.createdAt(),
-                now
-        );
-        instances.put(instanceId, updated);
-        return new AcceptedActionResponse(UUID.randomUUID(), now);
+        instanceRepository.updateState(instance.id(), status, desiredState, now);
+        UUID actionTaskId = instanceRepository.insertAction(instance.id(), request.action(), request.reason(), now);
+        return new AcceptedActionResponse(actionTaskId, now);
     }
 
     private ClawInstanceDto getInstance(UUID instanceId) {
-        ClawInstanceDto instance = instances.get(instanceId);
-        if (instance == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "instance not found");
-        }
-        return instance;
+        return instanceRepository.findById(instanceId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "instance not found"));
     }
 }

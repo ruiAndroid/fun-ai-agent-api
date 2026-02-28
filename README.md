@@ -6,7 +6,8 @@ Control API service for managing claw instances.
 
 - Java 17+
 - Spring Boot 4.0.3
-- Spring WebMVC + Validation + Actuator
+- Spring WebMVC + Validation + Actuator + JDBC
+- PostgreSQL
 
 ## Run
 
@@ -16,14 +17,19 @@ mvn spring-boot:run
 
 Default port: `8080`
 
+Default database config is in `src/main/resources/application.yml` and points to:
+
+- `jdbc:postgresql://172.21.138.98:5432/fun_ai_agent`
+- username: `funai_agent`
+
+Schema is auto-initialized at startup via `src/main/resources/schema.sql`.
+
 ## Current Scope
 
 - `GET /v1/health`
 - `GET /v1/instances`
 - `POST /v1/instances`
 - `POST /v1/instances/{instanceId}/actions`
-
-Current persistence is in-memory for bootstrap development.
 
 ## Update Script
 

@@ -13,6 +13,9 @@ spring:
       maximum-pool-size: 10
       minimum-idle: 2
       connection-timeout: 10000
+  sql:
+    init:
+      mode: always
 
 app:
   cors:
