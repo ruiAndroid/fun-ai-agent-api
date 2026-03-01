@@ -38,9 +38,9 @@ app:
     allow-custom-image: false
     presets:
       - id: zeroclaw-default
-        name: ZeroClaw Default
-        image: ${ZEROCLAW_PRESET_IMAGE:zeroclaw:latest}
-        description: Official ZeroClaw image (gateway mode)
+        name: ZeroClaw Shell Default
+        image: ${ZEROCLAW_PRESET_IMAGE:zeroclaw-shell:latest}
+        description: ZeroClaw image with shell support (gateway mode)
         recommended: true
 
 management:
