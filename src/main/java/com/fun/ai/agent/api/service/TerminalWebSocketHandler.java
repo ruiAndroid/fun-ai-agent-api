@@ -36,6 +36,7 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
     private final String dockerCommand;
     private final String containerPrefix;
     private final String shellPath;
+    private final List<String> shellCommandParts;
     private final Duration processShutdownTimeout;
     private final ExecutorService readerExecutor;
     private final Map<String, TerminalSessionContext> contexts = new ConcurrentHashMap<>();
@@ -49,6 +50,7 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
         this.dockerCommand = dockerCommand;
         this.containerPrefix = containerPrefix;
         this.shellPath = shellPath;
+        this.shellCommandParts = parseShellCommand(shellPath);
         this.processShutdownTimeout = Duration.ofSeconds(Math.max(1, processShutdownTimeoutSeconds));
         this.readerExecutor = Executors.newCachedThreadPool(r -> {
             Thread thread = new Thread(r, "fun-ai-terminal-reader");
@@ -203,8 +205,19 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
         command.add("exec");
         command.add("-i");
         command.add(containerName);
-        command.add(shellPath);
+        command.addAll(shellCommandParts);
         return command;
+    }
+
+    private List<String> parseShellCommand(String rawShellCommand) {
+        if (!StringUtils.hasText(rawShellCommand)) {
+            throw new IllegalArgumentException("terminal shell command must not be blank");
+        }
+        String[] tokens = rawShellCommand.trim().split("\\s+");
+        if (tokens.length == 0) {
+            throw new IllegalArgumentException("terminal shell command must not be blank");
+        }
+        return List.of(tokens);
     }
 
     private Optional<UUID> parseInstanceId(WebSocketSession session) {
