@@ -37,11 +37,26 @@ app:
   images:
     allow-custom-image: false
     presets:
-      - id: zeroclaw-default
-        name: ZeroClaw Shell Default
-        image: ${ZEROCLAW_PRESET_IMAGE:zeroclaw-shell:latest}
+      - id: zeroclaw-shell
+        name: ZeroClaw Shell
+        image: ${ZEROCLAW_PRESET_IMAGE_SHELL:${ZEROCLAW_PRESET_IMAGE:zeroclaw-shell:latest}}
         description: ZeroClaw image with shell support (gateway mode)
         recommended: true
+      - id: zeroclaw-python
+        name: ZeroClaw + Python
+        image: ${ZEROCLAW_PRESET_IMAGE_PYTHON:zeroclaw-python:latest}
+        description: ZeroClaw image with Python runtime
+        recommended: false
+      - id: zeroclaw-node
+        name: ZeroClaw + Node.js
+        image: ${ZEROCLAW_PRESET_IMAGE_NODE:zeroclaw-node:latest}
+        description: ZeroClaw image with Node.js runtime
+        recommended: false
+      - id: zeroclaw-python-node
+        name: ZeroClaw + Python + Node.js
+        image: ${ZEROCLAW_PRESET_IMAGE_PYTHON_NODE:zeroclaw-python-node:latest}
+        description: ZeroClaw image with Python and Node.js runtimes
+        recommended: false
 
 management:
   endpoints:
