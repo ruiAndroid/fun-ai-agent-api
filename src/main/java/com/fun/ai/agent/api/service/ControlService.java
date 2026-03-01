@@ -35,19 +35,22 @@ public class ControlService {
     private final int gatewayPortRangeStart;
     private final int gatewayPortRangeEnd;
     private final String gatewayUrlTemplate;
+    private final String remoteConnectCommandTemplate;
 
     public ControlService(InstanceRepository instanceRepository,
                           ImageCatalogProperties imageCatalogProperties,
                           PlaneClient planeClient,
                           @Value("${app.gateway.port-range-start:42617}") int gatewayPortRangeStart,
                           @Value("${app.gateway.port-range-end:42717}") int gatewayPortRangeEnd,
-                          @Value("${app.gateway.url-template:http://172.21.138.98:{port}}") String gatewayUrlTemplate) {
+                          @Value("${app.gateway.url-template:http://172.21.138.98:{port}}") String gatewayUrlTemplate,
+                          @Value("${app.remote-connect.command-template:}") String remoteConnectCommandTemplate) {
         this.instanceRepository = instanceRepository;
         this.imageCatalogProperties = imageCatalogProperties;
         this.planeClient = planeClient;
         this.gatewayPortRangeStart = gatewayPortRangeStart;
         this.gatewayPortRangeEnd = gatewayPortRangeEnd;
         this.gatewayUrlTemplate = gatewayUrlTemplate;
+        this.remoteConnectCommandTemplate = remoteConnectCommandTemplate;
     }
 
     public List<ClawInstanceDto> listInstances() {
@@ -98,6 +101,7 @@ public class ControlService {
                 image,
                 gatewayHostPort,
                 resolveGatewayUrl(instanceId, gatewayHostPort),
+                resolveRemoteConnectCommand(instanceId, gatewayHostPort),
                 InstanceRuntime.ZEROCLAW,
                 status,
                 desiredState,
@@ -133,6 +137,7 @@ public class ControlService {
                     instance.image(),
                     executionResult.gatewayHostPort(),
                     resolveGatewayUrl(instance.id(), executionResult.gatewayHostPort()),
+                    resolveRemoteConnectCommand(instance.id(), executionResult.gatewayHostPort()),
                     instance.runtime(),
                     finalStatus,
                     desiredState,
@@ -379,6 +384,7 @@ public class ControlService {
 
     private ClawInstanceDto attachGatewayUrl(ClawInstanceDto instance) {
         String gatewayUrl = resolveGatewayUrl(instance.id(), instance.gatewayHostPort());
+        String remoteConnectCommand = resolveRemoteConnectCommand(instance.id(), instance.gatewayHostPort());
         return new ClawInstanceDto(
                 instance.id(),
                 instance.name(),
@@ -386,6 +392,7 @@ public class ControlService {
                 instance.image(),
                 instance.gatewayHostPort(),
                 gatewayUrl,
+                remoteConnectCommand,
                 instance.runtime(),
                 instance.status(),
                 instance.desiredState(),
@@ -401,6 +408,19 @@ public class ControlService {
         return gatewayUrlTemplate
                 .replace("{port}", String.valueOf(gatewayHostPort))
                 .replace("{instanceId}", instanceId.toString());
+    }
+
+    private String resolveRemoteConnectCommand(UUID instanceId, Integer gatewayHostPort) {
+        if (!StringUtils.hasText(remoteConnectCommandTemplate)) {
+            return null;
+        }
+        String gatewayUrl = resolveGatewayUrl(instanceId, gatewayHostPort);
+        String portText = gatewayHostPort == null ? "" : String.valueOf(gatewayHostPort);
+        String gatewayUrlText = gatewayUrl == null ? "" : gatewayUrl;
+        return remoteConnectCommandTemplate
+                .replace("{instanceId}", instanceId.toString())
+                .replace("{gatewayPort}", portText)
+                .replace("{gatewayUrl}", gatewayUrlText);
     }
 
     private record PlaneExecutionResult(PlaneClient.PlaneTaskExecutionRecord execution, Integer gatewayHostPort) {

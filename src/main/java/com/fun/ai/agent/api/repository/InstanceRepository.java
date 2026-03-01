@@ -27,6 +27,7 @@ public class InstanceRepository {
             rs.getString("image"),
             (Integer) rs.getObject("gateway_host_port"),
             null,
+            null,
             InstanceRuntime.valueOf(rs.getString("runtime")),
             InstanceStatus.valueOf(rs.getString("status")),
             InstanceDesiredState.valueOf(rs.getString("desired_state")),

@@ -27,6 +27,8 @@ app:
     port-range-start: ${GATEWAY_PORT_RANGE_START:42617}
     port-range-end: ${GATEWAY_PORT_RANGE_END:42717}
     url-template: ${GATEWAY_URL_TEMPLATE:http://172.21.138.98:{port}}
+  remote-connect:
+    command-template: ${REMOTE_CONNECT_COMMAND_TEMPLATE:ssh root@172.21.138.98 "docker exec -it funclaw-{instanceId} /bin/sh"}
   images:
     allow-custom-image: false
     presets:

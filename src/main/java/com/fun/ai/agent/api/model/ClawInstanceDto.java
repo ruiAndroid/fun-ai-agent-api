@@ -10,6 +10,7 @@ public record ClawInstanceDto(
         String image,
         Integer gatewayHostPort,
         String gatewayUrl,
+        String remoteConnectCommand,
         InstanceRuntime runtime,
         InstanceStatus status,
         InstanceDesiredState desiredState,
