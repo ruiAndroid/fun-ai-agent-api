@@ -16,7 +16,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @RestController
-@RequestMapping("/api/v1/tasks")
+@RequestMapping({"/api/v1/tasks", "/v1/tasks"})
 public class TaskGatewayController {
 
     private final PlaneClient planeClient;

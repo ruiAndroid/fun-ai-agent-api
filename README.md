@@ -25,7 +25,7 @@ Environment variables:
 
 ## Endpoints
 
-- `POST /api/v1/tasks`
-- `GET /api/v1/tasks/{taskId}`
-- `POST /api/v1/tasks/{taskId}/cancel`
-- `GET /api/v1/tasks/{taskId}/events` (SSE)
+- `POST /api/v1/tasks` (compatible: `/v1/tasks`)
+- `GET /api/v1/tasks/{taskId}` (compatible: `/v1/tasks/{taskId}`)
+- `POST /api/v1/tasks/{taskId}/cancel` (compatible: `/v1/tasks/{taskId}/cancel`)
+- `GET /api/v1/tasks/{taskId}/events` (SSE, compatible: `/v1/tasks/{taskId}/events`)

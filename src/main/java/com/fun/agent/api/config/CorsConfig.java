@@ -14,6 +14,11 @@ public class CorsConfig implements WebFluxConfigurer {
                 .allowedOrigins("http://localhost:3000")
                 .allowedMethods("*")
                 .allowedHeaders("*");
+
+        registry
+                .addMapping("/v1/**")
+                .allowedOrigins("http://localhost:3000")
+                .allowedMethods("*")
+                .allowedHeaders("*");
     }
 }
-
