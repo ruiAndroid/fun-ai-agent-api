@@ -1,0 +1,17 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: fun-ai-agent-api
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+plane:
+  base-url: ${PLANE_BASE_URL:http://localhost:8100}
+  timeout-seconds: ${PLANE_TIMEOUT_SECONDS:30}
+
