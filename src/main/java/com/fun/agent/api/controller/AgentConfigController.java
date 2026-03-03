@@ -2,9 +2,12 @@ package com.fun.agent.api.controller;
 
 import com.fun.agent.api.model.config.AgentConfigsResponse;
 import com.fun.agent.api.model.config.ReplaceAgentConfigsRequest;
+import com.fun.agent.api.model.config.SkillConfigPayload;
+import com.fun.agent.api.model.config.UpdateSkillPromptRequest;
 import com.fun.agent.api.service.AgentConfigService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,5 +36,17 @@ public class AgentConfigController {
         return agentConfigService
                 .replaceAll(request.safeAgents())
                 .map(AgentConfigsResponse::new);
+    }
+
+    @PutMapping("/agents/{agentId}/skills/{skillId}")
+    public Mono<SkillConfigPayload> updateSkillPrompt(
+            @PathVariable String agentId,
+            @PathVariable String skillId,
+            @Valid @RequestBody UpdateSkillPromptRequest request) {
+        return agentConfigService.updateSkillPrompt(
+                agentId,
+                skillId,
+                request.name(),
+                request.promptTemplate());
     }
 }

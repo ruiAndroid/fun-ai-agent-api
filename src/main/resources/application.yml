@@ -26,3 +26,7 @@ management:
 plane:
   base-url: ${PLANE_BASE_URL:http://localhost:8100}
   timeout-seconds: ${PLANE_TIMEOUT_SECONDS:30}
+
+app:
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,https://studio.fun.tv}

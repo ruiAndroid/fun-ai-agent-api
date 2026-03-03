@@ -11,8 +11,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import org.springframework.http.HttpStatus;
 
 @Service
 public class AgentConfigService {
@@ -35,6 +37,31 @@ public class AgentConfigService {
                     List<AgentConfigPayload> sanitized = sanitizeAgents(rawAgents);
                     store.replaceAll(sanitized);
                     return store.findAll();
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    public Mono<SkillConfigPayload> updateSkillPrompt(String agentId, String skillId, String name, String promptTemplate) {
+        return Mono.fromCallable(() -> {
+                    String normalizedAgentId = normalizeRequired(agentId);
+                    String normalizedSkillId = normalizeRequired(skillId);
+                    String normalizedName = normalizeOptional(name, normalizedSkillId);
+                    String normalizedPrompt = normalizeOptional(promptTemplate, "");
+                    if (normalizedPrompt.isEmpty()) {
+                        throw new IllegalArgumentException("promptTemplate must not be empty");
+                    }
+
+                    boolean updated = store.updateSkillPrompt(
+                            normalizedAgentId,
+                            normalizedSkillId,
+                            normalizedName,
+                            normalizedPrompt);
+                    if (!updated) {
+                        throw new ResponseStatusException(
+                                HttpStatus.NOT_FOUND,
+                                "skill not found for agent: " + normalizedAgentId + "/" + normalizedSkillId);
+                    }
+                    return new SkillConfigPayload(normalizedSkillId, normalizedName, normalizedPrompt);
                 })
                 .subscribeOn(Schedulers.boundedElastic());
     }

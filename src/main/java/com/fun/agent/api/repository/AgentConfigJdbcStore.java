@@ -138,6 +138,20 @@ public class AgentConfigJdbcStore {
         }
     }
 
+    public boolean updateSkillPrompt(String agentId, String skillId, String skillName, String promptTemplate) {
+        int updated = jdbcTemplate.update(
+                """
+                UPDATE agent_cfg.skills
+                SET name = ?, prompt_template = ?, updated_at = NOW()
+                WHERE agent_id = ? AND skill_id = ?
+                """,
+                skillName,
+                promptTemplate,
+                agentId,
+                skillId);
+        return updated > 0;
+    }
+
     private static final class AgentRow {
         private final String agentId;
         private final String displayName;
