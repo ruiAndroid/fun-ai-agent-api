@@ -14,6 +14,8 @@ spring:
     create-schemas: true
     default-schema: agent_cfg
     schemas: agent_cfg
+    baseline-on-migrate: ${DB_BASELINE_ON_MIGRATE:true}
+    baseline-version: ${DB_BASELINE_VERSION:1}
 
 management:
   endpoints:
