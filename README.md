@@ -28,6 +28,10 @@ Environment variables:
 - `DB_USERNAME`
 - `DB_PASSWORD`
 - `DB_MIGRATION_ENABLED`
+- `GATEWAY_BASE_URL`
+- `GATEWAY_TOKEN`
+- `GATEWAY_TIMEOUT_SECONDS`
+- `GATEWAY_MODELS_CACHE_SECONDS`
 
 ## Endpoints
 
@@ -37,6 +41,7 @@ Environment variables:
 - `GET /api/v1/tasks/{taskId}/events` (SSE, compatible: `/v1/tasks/{taskId}/events`)
 - `GET /api/v1/config/agents` (compatible: `/v1/config/agents`)
 - `PUT /api/v1/config/agents` (compatible: `/v1/config/agents`)
+- `GET /api/v1/models` (compatible: `/v1/models`)
 
 ## Create task payload
 

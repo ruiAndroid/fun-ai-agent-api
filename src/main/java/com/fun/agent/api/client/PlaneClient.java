@@ -5,6 +5,7 @@ import java.util.Map;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ResponseStatusException;
@@ -21,7 +22,9 @@ public class PlaneClient {
     private final WebClient webClient;
     private final Duration timeout;
 
-    public PlaneClient(WebClient planeWebClient, Duration planeTimeout) {
+    public PlaneClient(
+            @Qualifier("planeWebClient") WebClient planeWebClient,
+            @Qualifier("planeTimeout") Duration planeTimeout) {
         this.webClient = planeWebClient;
         this.timeout = planeTimeout;
     }
@@ -69,4 +72,3 @@ public class PlaneClient {
                 new ResponseStatusException(response.statusCode(), message));
     }
 }
-

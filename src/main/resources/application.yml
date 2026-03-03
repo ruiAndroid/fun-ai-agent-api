@@ -27,6 +27,12 @@ plane:
   base-url: ${PLANE_BASE_URL:http://localhost:8100}
   timeout-seconds: ${PLANE_TIMEOUT_SECONDS:30}
 
+gateway:
+  base-url: ${GATEWAY_BASE_URL:https://api.ai.fun.tv/v1}
+  token: ${GATEWAY_TOKEN:}
+  timeout-seconds: ${GATEWAY_TIMEOUT_SECONDS:15}
+  models-cache-seconds: ${GATEWAY_MODELS_CACHE_SECONDS:30}
+
 app:
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,https://studio.fun.tv}
