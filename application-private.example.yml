@@ -1,0 +1,5 @@
+gateway:
+  base-url: https://api.ai.fun.tv/v1
+  token: "replace-with-your-gateway-token"
+  timeout-seconds: 15
+  models-cache-seconds: 30

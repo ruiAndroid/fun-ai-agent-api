@@ -2,6 +2,8 @@ server:
   port: 8080
 
 spring:
+  config:
+    import: optional:file:./application-private.yml
   application:
     name: fun-ai-agent-api
   datasource:
@@ -28,10 +30,10 @@ plane:
   timeout-seconds: ${PLANE_TIMEOUT_SECONDS:30}
 
 gateway:
-  base-url: ${GATEWAY_BASE_URL:https://api.ai.fun.tv/v1}
-  token: ${GATEWAY_TOKEN:}
-  timeout-seconds: ${GATEWAY_TIMEOUT_SECONDS:15}
-  models-cache-seconds: ${GATEWAY_MODELS_CACHE_SECONDS:30}
+  base-url: https://api.ai.fun.tv/v1
+  token: ""
+  timeout-seconds: 15
+  models-cache-seconds: 30
 
 app:
   cors:

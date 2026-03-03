@@ -33,6 +33,13 @@ Environment variables:
 - `GATEWAY_TIMEOUT_SECONDS`
 - `GATEWAY_MODELS_CACHE_SECONDS`
 
+Or use file-based config (no env vars):
+
+- copy `application-private.example.yml` to `application-private.yml`
+- set `gateway.token` in `application-private.yml`
+- app auto-loads this file via `spring.config.import`
+- make sure runtime env does not set `GATEWAY_TOKEN` to empty string
+
 ## Endpoints
 
 - `POST /api/v1/tasks` (compatible: `/v1/tasks`)

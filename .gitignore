@@ -2,4 +2,4 @@ target/
 *.log
 .idea/
 .vscode/
-
+application-private.yml
