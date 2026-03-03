@@ -3,10 +3,13 @@ package com.fun.agent.api.controller;
 import com.fun.agent.api.model.config.AgentConfigsResponse;
 import com.fun.agent.api.model.config.ReplaceAgentConfigsRequest;
 import com.fun.agent.api.model.config.SkillConfigPayload;
+import com.fun.agent.api.model.config.SkillPromptVariantPayload;
 import com.fun.agent.api.model.config.UpdateSkillPromptRequest;
+import com.fun.agent.api.model.config.UpdateSkillVariantPromptRequest;
 import com.fun.agent.api.service.AgentConfigService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -48,5 +51,26 @@ public class AgentConfigController {
                 skillId,
                 request.name(),
                 request.promptTemplate());
+    }
+
+    @PutMapping("/agents/{agentId}/skills/{skillId}/variants/{variantKey}")
+    public Mono<SkillPromptVariantPayload> upsertSkillPromptVariant(
+            @PathVariable String agentId,
+            @PathVariable String skillId,
+            @PathVariable String variantKey,
+            @Valid @RequestBody UpdateSkillVariantPromptRequest request) {
+        return agentConfigService.upsertSkillPromptVariant(
+                agentId,
+                skillId,
+                variantKey,
+                request.promptTemplate());
+    }
+
+    @DeleteMapping("/agents/{agentId}/skills/{skillId}/variants/{variantKey}")
+    public Mono<Void> deleteSkillPromptVariant(
+            @PathVariable String agentId,
+            @PathVariable String skillId,
+            @PathVariable String variantKey) {
+        return agentConfigService.deleteSkillPromptVariant(agentId, skillId, variantKey);
     }
 }

@@ -1,6 +1,7 @@
 package com.fun.agent.api.service;
 
 import com.fun.agent.api.model.config.AgentConfigPayload;
+import com.fun.agent.api.model.config.SkillPromptVariantPayload;
 import com.fun.agent.api.model.config.SkillConfigPayload;
 import com.fun.agent.api.model.config.WorkflowConfigPayload;
 import com.fun.agent.api.repository.AgentConfigJdbcStore;
@@ -20,6 +21,7 @@ import org.springframework.http.HttpStatus;
 public class AgentConfigService {
 
     private static final Set<String> ALLOWED_STATUS = Set.of("ONLINE", "DEGRADED", "OFFLINE");
+    private static final String VARIANT_KEY_REGEX = "^[a-z0-9_]+$";
 
     private final AgentConfigJdbcStore store;
 
@@ -61,9 +63,61 @@ public class AgentConfigService {
                                 HttpStatus.NOT_FOUND,
                                 "skill not found for agent: " + normalizedAgentId + "/" + normalizedSkillId);
                     }
-                    return new SkillConfigPayload(normalizedSkillId, normalizedName, normalizedPrompt);
+                    return new SkillConfigPayload(normalizedSkillId, normalizedName, normalizedPrompt, Map.of());
                 })
                 .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    public Mono<SkillPromptVariantPayload> upsertSkillPromptVariant(
+            String agentId,
+            String skillId,
+            String variantKey,
+            String promptTemplate) {
+        return Mono.fromCallable(() -> {
+                    String normalizedAgentId = normalizeRequired(agentId);
+                    String normalizedSkillId = normalizeRequired(skillId);
+                    String normalizedVariantKey = normalizeVariantKey(variantKey);
+                    String normalizedPrompt = normalizeOptional(promptTemplate, "");
+                    if (normalizedPrompt.isEmpty()) {
+                        throw new IllegalArgumentException("promptTemplate must not be empty");
+                    }
+                    store.upsertSkillPromptVariant(
+                            normalizedAgentId,
+                            normalizedSkillId,
+                            normalizedVariantKey,
+                            normalizedPrompt);
+                    return new SkillPromptVariantPayload(
+                            normalizedAgentId,
+                            normalizedSkillId,
+                            normalizedVariantKey,
+                            normalizedPrompt);
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    public Mono<Void> deleteSkillPromptVariant(String agentId, String skillId, String variantKey) {
+        return Mono.fromCallable(() -> {
+                    String normalizedAgentId = normalizeRequired(agentId);
+                    String normalizedSkillId = normalizeRequired(skillId);
+                    String normalizedVariantKey = normalizeVariantKey(variantKey);
+                    boolean deleted = store.deleteSkillPromptVariant(
+                            normalizedAgentId,
+                            normalizedSkillId,
+                            normalizedVariantKey);
+                    if (!deleted) {
+                        throw new ResponseStatusException(
+                                HttpStatus.NOT_FOUND,
+                                "variant not found for skill: "
+                                        + normalizedAgentId
+                                        + "/"
+                                        + normalizedSkillId
+                                        + "/"
+                                        + normalizedVariantKey);
+                    }
+                    return null;
+                })
+                .subscribeOn(Schedulers.boundedElastic())
+                .then();
     }
 
     private List<AgentConfigPayload> sanitizeAgents(List<AgentConfigPayload> rawAgents) {
@@ -133,12 +187,30 @@ public class AgentConfigService {
                 continue;
             }
             String id = normalizeRequired(raw.id());
+            Map<String, String> variants = sanitizePromptVariants(raw.promptVariants());
             deduped.put(id, new SkillConfigPayload(
                     id,
                     normalizeOptional(raw.name(), id),
-                    normalizeOptional(raw.promptTemplate(), "")));
+                    normalizeOptional(raw.promptTemplate(), ""),
+                    variants));
         }
         return new ArrayList<>(deduped.values());
+    }
+
+    private Map<String, String> sanitizePromptVariants(Map<String, String> rawVariants) {
+        if (rawVariants == null || rawVariants.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> result = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : rawVariants.entrySet()) {
+            String key = normalizeVariantKey(entry.getKey());
+            String prompt = normalizeOptional(entry.getValue(), "");
+            if (prompt.isEmpty()) {
+                continue;
+            }
+            result.put(key, prompt);
+        }
+        return result;
     }
 
     private String normalizeDefaultWorkflowId(String rawDefault, List<WorkflowConfigPayload> workflows) {
@@ -168,6 +240,14 @@ public class AgentConfigService {
         String normalized = normalizeOptional(value, "");
         if (normalized.isEmpty()) {
             throw new IllegalArgumentException("id must not be empty");
+        }
+        return normalized;
+    }
+
+    private String normalizeVariantKey(String value) {
+        String normalized = normalizeRequired(value);
+        if (!normalized.matches(VARIANT_KEY_REGEX)) {
+            throw new IllegalArgumentException("variantKey must match ^[a-z0-9_]+$");
         }
         return normalized;
     }

@@ -64,10 +64,36 @@ public class AgentConfigJdbcStore {
                         rs.getString("skill_id"),
                         rs.getString("name"),
                         rs.getString("prompt_template")));
+
+        List<SkillPromptVariantRow> variantRows = jdbcTemplate.query(
+                """
+                SELECT agent_id, skill_id, variant_key, prompt_template
+                FROM agent_cfg.skill_prompt_variants
+                ORDER BY agent_id, skill_id, variant_key
+                """,
+                (rs, rowNum) -> new SkillPromptVariantRow(
+                        rs.getString("agent_id"),
+                        rs.getString("skill_id"),
+                        rs.getString("variant_key"),
+                        rs.getString("prompt_template")));
+
+        Map<String, Map<String, String>> variantsByAgentSkill = new LinkedHashMap<>();
+        for (SkillPromptVariantRow row : variantRows) {
+            String key = row.agentId + "::" + row.skillId;
+            variantsByAgentSkill
+                    .computeIfAbsent(key, ignored -> new LinkedHashMap<>())
+                    .put(row.variantKey, row.promptTemplate);
+        }
+
         Map<String, List<SkillConfigPayload>> skillsByAgent = new LinkedHashMap<>();
         for (SkillRow row : skillRows) {
+            String variantMapKey = row.agentId + "::" + row.skillId;
             skillsByAgent.computeIfAbsent(row.agentId, ignored -> new ArrayList<>())
-                    .add(new SkillConfigPayload(row.skillId, row.name, row.promptTemplate));
+                    .add(new SkillConfigPayload(
+                            row.skillId,
+                            row.name,
+                            row.promptTemplate,
+                            variantsByAgentSkill.getOrDefault(variantMapKey, Map.of())));
         }
 
         List<AgentConfigPayload> result = new ArrayList<>(agentRows.size());
@@ -134,6 +160,22 @@ public class AgentConfigJdbcStore {
                         skill.name(),
                         skill.promptTemplate(),
                         skillSort++);
+
+                if (skill.promptVariants() == null || skill.promptVariants().isEmpty()) {
+                    continue;
+                }
+                for (Map.Entry<String, String> entry : skill.promptVariants().entrySet()) {
+                    jdbcTemplate.update(
+                            """
+                            INSERT INTO agent_cfg.skill_prompt_variants
+                            (agent_id, skill_id, variant_key, prompt_template, updated_at)
+                            VALUES (?, ?, ?, ?, NOW())
+                            """,
+                            agent.id(),
+                            skill.id(),
+                            entry.getKey(),
+                            entry.getValue());
+                }
             }
         }
     }
@@ -150,6 +192,33 @@ public class AgentConfigJdbcStore {
                 agentId,
                 skillId);
         return updated > 0;
+    }
+
+    public void upsertSkillPromptVariant(String agentId, String skillId, String variantKey, String promptTemplate) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO agent_cfg.skill_prompt_variants
+                (agent_id, skill_id, variant_key, prompt_template, updated_at)
+                VALUES (?, ?, ?, ?, NOW())
+                ON CONFLICT (agent_id, skill_id, variant_key)
+                DO UPDATE SET prompt_template = EXCLUDED.prompt_template, updated_at = NOW()
+                """,
+                agentId,
+                skillId,
+                variantKey,
+                promptTemplate);
+    }
+
+    public boolean deleteSkillPromptVariant(String agentId, String skillId, String variantKey) {
+        int deleted = jdbcTemplate.update(
+                """
+                DELETE FROM agent_cfg.skill_prompt_variants
+                WHERE agent_id = ? AND skill_id = ? AND variant_key = ?
+                """,
+                agentId,
+                skillId,
+                variantKey);
+        return deleted > 0;
     }
 
     private static final class AgentRow {
@@ -207,6 +276,20 @@ public class AgentConfigJdbcStore {
             this.agentId = agentId;
             this.skillId = skillId;
             this.name = name;
+            this.promptTemplate = promptTemplate;
+        }
+    }
+
+    private static final class SkillPromptVariantRow {
+        private final String agentId;
+        private final String skillId;
+        private final String variantKey;
+        private final String promptTemplate;
+
+        private SkillPromptVariantRow(String agentId, String skillId, String variantKey, String promptTemplate) {
+            this.agentId = agentId;
+            this.skillId = skillId;
+            this.variantKey = variantKey;
             this.promptTemplate = promptTemplate;
         }
     }
