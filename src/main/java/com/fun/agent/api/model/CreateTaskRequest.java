@@ -19,6 +19,8 @@ public record CreateTaskRequest(
         @Size(max = 12000) String skillPromptOverride,
         @JsonAlias("skill_prompt_overrides")
         Map<String, String> skillPromptOverrides,
+        @JsonAlias("input_payload")
+        Map<String, Object> inputPayload,
         @NotBlank @Size(max = 6000) String prompt,
         @JsonAlias("idempotency_key")
         @Size(max = 128) String idempotencyKey
@@ -41,6 +43,9 @@ public record CreateTaskRequest(
         Map<String, String> sanitizedOverrides = sanitizeSkillPromptOverrides(skillPromptOverrides);
         if (!sanitizedOverrides.isEmpty()) {
             payload.put("skill_prompt_overrides", sanitizedOverrides);
+        }
+        if (inputPayload != null && !inputPayload.isEmpty()) {
+            payload.put("input_payload", inputPayload);
         }
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             payload.put("idempotency_key", idempotencyKey);
