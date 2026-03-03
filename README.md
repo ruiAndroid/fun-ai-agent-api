@@ -6,6 +6,8 @@ Unified API gateway for the agent platform.
 
 - Java 17
 - Spring Boot 3 (WebFlux)
+- PostgreSQL
+- Flyway
 
 ## Run locally
 
@@ -22,6 +24,10 @@ Environment variables:
 
 - `PLANE_BASE_URL`
 - `PLANE_TIMEOUT_SECONDS`
+- `DB_URL`
+- `DB_USERNAME`
+- `DB_PASSWORD`
+- `DB_MIGRATION_ENABLED`
 
 ## Endpoints
 
@@ -29,6 +35,8 @@ Environment variables:
 - `GET /api/v1/tasks/{taskId}` (compatible: `/v1/tasks/{taskId}`)
 - `POST /api/v1/tasks/{taskId}/cancel` (compatible: `/v1/tasks/{taskId}/cancel`)
 - `GET /api/v1/tasks/{taskId}/events` (SSE, compatible: `/v1/tasks/{taskId}/events`)
+- `GET /api/v1/config/agents` (compatible: `/v1/config/agents`)
+- `PUT /api/v1/config/agents` (compatible: `/v1/config/agents`)
 
 ## Create task payload
 
@@ -44,3 +52,9 @@ Gateway accepts both `snake_case` and `camelCase` for these fields:
 - `idempotency_key` / `idempotencyKey` (optional)
 
 Gateway forwards validated fields to plane as `snake_case`.
+
+## Runtime config persistence
+
+- Flyway migration creates tables under schema `agent_cfg`.
+- `PUT /v1/config/agents` accepts full agent/workflow/skill config and replaces persisted config atomically.
+- `GET /v1/config/agents` returns normalized config in frontend-friendly `camelCase`.

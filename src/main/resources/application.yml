@@ -4,6 +4,16 @@ server:
 spring:
   application:
     name: fun-ai-agent-api
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/fun_ai_agent}
+    username: ${DB_USERNAME:funai_agent}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: ${DB_MIGRATION_ENABLED:true}
+    create-schemas: true
+    default-schema: agent_cfg
+    schemas: agent_cfg
 
 management:
   endpoints:
@@ -14,4 +24,3 @@ management:
 plane:
   base-url: ${PLANE_BASE_URL:http://localhost:8100}
   timeout-seconds: ${PLANE_TIMEOUT_SECONDS:30}
-
