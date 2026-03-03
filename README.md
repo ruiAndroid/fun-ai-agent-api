@@ -1,4 +1,4 @@
-# fun-ai-agent-api
+﻿# fun-ai-agent-api
 
 Unified API gateway for the agent platform.
 
@@ -29,3 +29,18 @@ Environment variables:
 - `GET /api/v1/tasks/{taskId}` (compatible: `/v1/tasks/{taskId}`)
 - `POST /api/v1/tasks/{taskId}/cancel` (compatible: `/v1/tasks/{taskId}/cancel`)
 - `GET /api/v1/tasks/{taskId}/events` (SSE, compatible: `/v1/tasks/{taskId}/events`)
+
+## Create task payload
+
+Gateway accepts both `snake_case` and `camelCase` for these fields:
+
+- `tenant_id` / `tenantId`
+- `agent_id` / `agentId`
+- `workflow_id` / `workflowId` (optional)
+- `skill_id` / `skillId` (optional)
+- `skill_prompt_override` / `skillPromptOverride` (optional)
+- `skill_prompt_overrides` / `skillPromptOverrides` (optional)
+- `prompt`
+- `idempotency_key` / `idempotencyKey` (optional)
+
+Gateway forwards validated fields to plane as `snake_case`.
